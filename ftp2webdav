@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+import argparse
+import easywebdav
+import logging
+import os
+from pyftpdlib.authorizers import DummyAuthorizer, AuthenticationFailed
+from pyftpdlib.handlers import FTPHandler
+from pyftpdlib.servers import FTPServer
+import sys
+import tempfile
+import yaml
+
+# Construct ArgumentParser
+parser = argparse.ArgumentParser()
+parser.add_argument('--verbose', '-v', action='count', default=0, help="verbose mode (use -vv, -vvv for more verbosity)")
+parser.add_argument('--conf', '-c', help="config file")
+parser.add_argument('--log-file', help="log file")
+
+# Parse arguments
+args = parser.parse_args()
+
+# Configure logging
+LOG_LEVEL = [logging.INFO, logging.DEBUG, 5, 0]
+level = LOG_LEVEL[args.verbose]
+logformat = '%(asctime)-15s - %(name)s - %(levelname)s - %(message)s'
+logging.basicConfig(level=level, format=logformat)
+
+if args.log_file:
+    fh = logging.FileHandler(args.log_file)
+    fh.setFormatter(logging.Formatter(logformat))
+    logging.getLogger('').addHandler(fh)
+
+logger = logging.getLogger('ftp2webdav')
+
+
+def fail(message):
+    logger.error(message)
+    sys.stderr.write('{}\n'.format(message))
+    sys.exit(1)
+
+
+# Read configuration
+config = None
+try:
+    with open(args.conf) as conf_file:
+        try:
+            config = yaml.load(conf_file)
+        except yaml.YAMLError as exc:
+            fail('Error reading config: {}'.format(exc))
+except IOError as exc:
+    fail('Error reading config: {}'.format(exc))
+
+ftp_conf = config.get('ftp', {})
+webdav_conf = config.get('webdav', {})
+
+if 'host' not in webdav_conf:
+    fail('No WebDAV host configured.')
+
+
+# build WebDAV client
+def build_client(config, username, password):
+    host = config['host']
+
+    kwargs = {}
+    for option in ('port', 'protocol', 'verify_ssl', 'cert', 'path'):
+        if option in config:
+            kwargs[option] = config[option]
+
+    kwargs['username'] = username
+    kwargs['password'] = password
+
+    return easywebdav.connect(host, **kwargs)
+
+
+# Process received file routine
+def process_file(handler, filename):
+    basename = os.path.basename(filename)
+    logger.info('Received file {}'.format(basename))
+
+    # Get WebDAV client
+    webdav = handler.authorizer.sessions[handler.username].webdav_client
+
+    # Create necessary directories
+    webdav.mkdirs(webdav_conf['target_dir'])
+
+    # Upload file
+    webdav.upload(filename, os.path.join(webdav_conf['target_dir'], basename))
+
+    logger.info('File was uploaded successfully.')
+    os.remove(filename)
+
+
+# Build FTP Server
+def get_base_dir(username):
+    pass
+
+
+class UserSession(object):
+
+    def __init__(self, username, password):
+        # Create WebDAV client
+        self.webdav_client = build_client(webdav_conf, username, password)
+
+        # Check authentication
+        try:
+            self.webdav_client.exists('.')
+        except easywebdav.OperationFailed as ex:
+            if ex.actual_code == 401:
+                raise AuthenticationFailed()
+            else:
+                raise ex
+
+        self.base_dir = '/dev/shm/ftp2webdav/{}/'.format(username)
+        os.makedirs(self.base_dir, exist_ok=True)
+
+
+class WebDAVAuthorizer(object):
+    sessions = {}
+
+    def get_home_dir(self, username):
+        return self.sessions[username].base_dir
+
+    def has_perm(self, username, perm, path=None):
+        return perm == 'w'
+
+    def get_msg_login(self, username):
+        return "Login succesful"
+
+    def get_msg_quit(self, username):
+        del self.sessions[username]
+        return "Goodbye."
+
+    def impersonate_user(self, username, password):
+        pass
+
+    def terminate_impersonation(self, username):
+        pass
+
+    def validate_authentication(self, username, password, handler):
+        self.sessions[username] = UserSession(username, password)
+
+
+handler = FTPHandler
+handler.authorizer = WebDAVAuthorizer()
+handler.on_file_received = process_file
+handler.sessions = {}
+
+address = (ftp_conf.get('host', '0.0.0.0'), ftp_conf.get('port', 21))
+server = FTPServer(address, handler)
+
+# Start FTP Server
+server.serve_forever()
