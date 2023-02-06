@@ -1,17 +1,18 @@
 import argparse
 import logging
-import os
 import sys
+from pathlib import Path
 
 import yaml
 
-from ftp2webdav import FTP2WebDAV
+from ftp2webdav.config import build_configuration
+from ftp2webdav.server import FTP2WebDAV
 
 
 def build_argparser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--config-file', '-c', help="config file")
+    parser.add_argument('--config-file', '-c', type=Path, help="config file")
     parser.add_argument('--verbose', '-v', action='store_true', help="verbose mode")
 
     return parser
@@ -24,24 +25,29 @@ def run():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format='%(asctime)-15s %(levelname)-8s %(message)s')
 
-    def get_config_file():
-        if args.config_file:
-            return os.path.expanduser(args.config_file)
-        else:
-            for file in map(os.path.expanduser, ("~/.ftp2webdav.conf", "/etc/ftp2webdav.conf")):
-                if os.path.exists(file):
-                    return file
+    # Find config file
+    config_file = None
+    if args.config_file:
+        config_file = args.config_file.expanduser()
+    else:
+        for file in (Path("~/.ftp2webdav.conf").expanduser(), Path("/etc/ftp2webdav.conf")):
+            if file.exists():
+                config_file = file
+                break
 
-    config_file = get_config_file()
-
-    if not config_file:
+    if config_file is None:
         sys.exit("No configuration file found.")
 
     try:
-        with open(config_file) as config_file:
-            config = yaml.safe_load(config_file)
+        with config_file.open() as fh:
+            config = build_configuration(yaml.safe_load(fh))
     except yaml.YAMLError:
-        sys.exit("Invalid YAML in configuration file: {}".format(config))
+        sys.exit(f"Invalid YAML in configuration file: {config}")
 
-    ftp = FTP2WebDAV(config)
-    ftp.serve_forever()
+    ftp = FTP2WebDAV(
+        webdav_config=config['webdav'],
+        target_dir=Path(config['target_dir']),
+        ftp_host=config['ftp']['host'],
+        ftp_port=config['ftp']['port'],
+    )
+    ftp.start()

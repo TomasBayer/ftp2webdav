@@ -1,44 +1,38 @@
-import os
-
 from cerberus import Validator
 
-
-def _file_validator(field, value, error):
-    if not os.path.isdir(value):
-        error(field, "Must be an existing file")
-
-
-def _build_schema():
-    string = dict(type='string')
-    boolean = dict(type='boolean')
-    integer = dict(type='integer', coerce=int)
-
-    file = dict(type='string', coerce=os.path.expanduser, validator=_file_validator)
-
-    port = dict(integer, min=1, max=65535)
-
-    sub_dict = lambda **d: dict(type='dict', schema=d)
-    required = lambda schema: dict(schema, required=True)
-    with_default = lambda schema, default: dict(schema, default=default)
-
-    return dict(
-        ftp=with_default(sub_dict(
-            host=with_default(string, "127.0.0.1"),
-            port=with_default(port, "21")
-        ), {}),
-        webdav=required(sub_dict(
-            host=required(string),
-            port=port,
-            protocol=with_default(dict(string, allowed=['http', 'https']), "https"),
-            path=string,
-            verify_ssl=with_default(boolean, True),
-            cert=file
-        )),
-        target_dir=with_default(string, "."),
-    )
-
-
-_SCHEMA = _build_schema()
+_SCHEMA = {
+    "ftp": {
+        "type": "dict",
+        "schema": {
+            "host": {"type": "string", "default": "127.0.0.1"},
+            "port": {
+                "type": "integer",
+                "coerce": int,
+                "min": 1,
+                "max": 65535,
+                "default": 21,
+            },
+        },
+        "default": {},
+    },
+    "webdav": {
+        "type": "dict",
+        "required": True,
+        "schema": {
+            "host": {"type": "string", "required": True},
+            "port": {"type": "integer", "coerce": int, "min": 1, "max": 65535},
+            "protocol": {
+                "type": "string",
+                "allowed": ["http", "https"],
+                "default": "https",
+            },
+            "path": {"type": "string"},
+            "verify_ssl": {"type": "boolean", "default": True},
+            "cert": {"type": "string"},
+        },
+    },
+    "target_dir": {"type": "string", "default": "."},
+}
 
 
 class ConfigurationError(Exception):
