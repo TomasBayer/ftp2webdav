@@ -1,6 +1,18 @@
-/dist/
-/*.egg-info/
-/.venv/
-/.idea/
+# pycache
 __pycache__/
-*pyc
+*.pyc
+
+# virtual environments
+/venv*/
+/.venv*/
+
+# IDE files
+/.idea/
+/.fleet/
+/.vscode/
+
+# Build files
+/dist/
+
+# Poetry lock files
+poetry.lock
