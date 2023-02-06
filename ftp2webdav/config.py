@@ -1,5 +1,7 @@
-from cerberus import Validator
 import os
+
+from cerberus import Validator
+
 
 def _file_validator(field, value, error):
     if not os.path.isdir(value):

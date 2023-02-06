@@ -2,11 +2,12 @@ import logging
 import os
 
 import easywebdav
-from ftprelay import FTPRelay, AuthenticationFailedError
-from ftp2webdav.config import build_configuration
-
 # TODO: Replace this dirty workaround for amnong/easywebdav#26
 import easywebdav.client
+from ftprelay import AuthenticationFailedError, FTPRelay
+
+from ftp2webdav.config import build_configuration
+
 easywebdav.basestring = str
 easywebdav.client.basestring = str
 
