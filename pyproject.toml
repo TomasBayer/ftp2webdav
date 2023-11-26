@@ -19,6 +19,40 @@ pyyaml = "^6.0"
 [tool.poetry.dev-dependencies]
 pytest = "^7"
 
+[tool.ruff]
+line-length = 120
+select = [
+    "F",  # flake8
+    "B",  # bugbear
+    "E",  # pycodestyle
+    "I",  # isort
+    "N",  # pep8-naming
+    "UP", # pyupgrade
+    "YTT", # sys.version check
+    "S", # bandit
+    "A001", "A002", # shadowing of builtins
+    "FBT", # boolean trap
+    "SIM", # simplify
+    "COM", # commas
+    "C4", # comprehensions
+    "DTZ", # TZ aware datetime
+    "T20", # print statements
+    "RET501", "RET502", "RET503", "RET504", # return statements
+    "PTH", # use pathlib
+    "ERA", # eradicate
+    "UP", # pyupgrade
+    "RUF", # ruff rules
+    "PYI", # pyi
+]
+ignore = [
+    "SIM102", # nested ifs
+]
+
+[tool.ruff.per-file-ignores]
+"tests/**/*.py" = [
+    "S101", # asserts
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
