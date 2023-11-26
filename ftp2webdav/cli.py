@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import Annotated, Optional
 
+import pkg_resources
 import typer
 import yaml
 from click import ClickException
@@ -24,6 +25,10 @@ def run(
             "--config", "-c",
             help="Path to config file.",
         )] = None,
+        create_example_config: Annotated[bool, typer.Option(
+            "--create-example-config",
+            help=f"Create an example configuration at {DEFAULT_CONFIG_FILE_PATHS[0]} and exits.",
+        )] = False,
         verbose: Annotated[bool, typer.Option(
             "--verbose", "-v",
             help="Verbose output.",
@@ -31,6 +36,15 @@ def run(
 ):
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=log_level, format='%(asctime)-15s %(levelname)-8s %(message)s')
+
+    if create_example_config:
+        if DEFAULT_CONFIG_FILE_PATHS[0].exists():
+            raise ClickException(f"Error: A config file already exists at {DEFAULT_CONFIG_FILE_PATHS[0]}.")
+        else:
+            with DEFAULT_CONFIG_FILE_PATHS[0].open('wb') as fh:
+                fh.write(pkg_resources.resource_string(__name__, 'resources/example-config.yml'))
+            typer.echo(f"An example config file has been created at {DEFAULT_CONFIG_FILE_PATHS[0]}.")
+            raise typer.Exit(0)
 
     # Find config file
     if config_file is None:
