@@ -1,5 +1,8 @@
 # ftp2webdav
 
+[![PyPI - Version](https://img.shields.io/pypi/v/ftp2webdav)](https://pypi.org/project/ftp2webdav/)
+
+
 `ftp2webdav` is an FTP server that forwards all uploaded files to a WebDAV server.
 It was developed with the specific goal of retrofitting a [Nextcloud](https://nextcloud.com/) interface into older
 devices or software that exclusively support FTP upload for file transfer.
